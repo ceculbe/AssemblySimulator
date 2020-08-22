@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+body {
+
+  font-family: Arial, sans-serif;
+  color: #eeffff;
+  background-color: #444455;
+ }
+ table{
+  text-align: left;
+}
+th{
+  border: 1px solid white;
+  font-size: 40px;
+}
+</style>
+</head>
+<body>
+
+<p>
+<h2>ASSEMBLY LANGUAGE SIMULATOR</h2>
+</p>
+<table id="registers">
+  <tr style="text-align: center">
+    <td width=100px>Register A</td>
+    <td width=100px>Register B</td>
+    <td width=100px>Register C</td>
+    <td width=100px>Register D</td>
+  </tr>
+  <tr height = 50px, style="text-align: center">
+    <th>0</th>
+    <th>0</th>
+    <th>0</th>
+    <th>0</th>
+  </tr>
+</table>
+
+<p>
+<input type="button" onclick="stepOne()" value="Step">
+<input type="button" onclick="run()" value="Run">
+<input type="button" onclick="pause()" value="Pause">
+<input type="button" onclick="reset()" value="Reset">
+<output id="debug">
+</p>
+
+<table id="program">
+  <tr>
+    <td>*</td>
+    <td>1</td>
+    <td width=150px, style="text-align: left">INPT D</td>
+  </tr>
+  <tr>
+    <td> </td>
+    <td>2</td>
+    <td>LOAD B, 2</td>
+  </tr>
+  <tr>
+    <td> </td>
+    <td>3</td>
+    <td>LOAD C, D</td>
+  </tr>
+  <tr>
+    <td> </td>
+    <td>4</td>
+    <td>LOAD A, B</td>
+  </tr>
+  <tr>
+    <td> </td>
+    <td>5</td>
+    <td>NEGA</td>
+  </tr>
+  <tr>
+    <td> </td>
+    <td>6</td>
+    <td>ADDA C</td>
+  </tr>
+  <tr>
+    <td> </td>
+    <td>7</td>
+    <td>JMPZ 12</td>
+  </tr>
+  <tr>
+    <td> </td>
+    <td>8</td>
+    <td>LOAD C, A</td>
+  </tr>
+  <tr>
+    <td> </td>
+    <td>9</td>
+    <td>JMPP 4</td>
+  </tr>
+  <tr>
+    <td> </td>
+    <td>10</td>
+    <td>ADDB 1</td>
+  </tr>
+  <tr>
+    <td> </td>
+    <td>11</td>
+    <td>JUMP 3</td>
+  </tr>
+  <tr>
+    <td> </td>
+    <td>12</td>
+    <td>OTPT B</td>
+  </tr>
+  <tr>
+    <td></td>
+    <td>13</td>
+    <td>END OF PROGRAM</td>
+  </tr>
+</table>
+
+<p id="notes">To edit: use up/down arrows to select a line. Type a new instruction and press ENTER. To remove a whole line, press DELETE. To add a whole line, press +. To cancel an edit, press ESC. </p>
+
+<script>
+var cursor = 0;
+var pointer = 0;
+var A = 0;
+var B = 0;
+var C = 0;
+var D = 0;
+var length = 12;
+var userString = "";
+var oldString = "";
+var typing = false;
+var error = false;
+var running = false;
+var timer;
+var program = document.getElementById('program'); 
+updateRegisters();
+
+window.addEventListener("keydown", function (event) {
+  if (event.defaultPrevented) {
+    return; // Do nothing if the event was already processed
+  }
+  var currCell = program.rows[cursor].cells[2];  
+ 
+  switch (event.key) {
+    case "ArrowDown":
+      if(!typing){
+	  	moveCursor(1);
+      }
+      break;
+    case "ArrowUp":
+      if(!typing){
+        moveCursor(-1);
+      }
+      break;
+    case "Delete":
+      if(!typing){
+        defocus();
+        remove();
+        focus();
+      }
+      break;
+    case "Enter":
+      if( cursor != length){
+        currCell.innerHTML = userString;
+        userString = "";
+        typing = false;
+        moveCursor(1);
+      }
+      break;
+    case "Escape":
+      userString = "";
+      currCell.innerHTML = oldString;
+      typing = false;
+      break;
+    case "Backspace":
+      userString = userString.substring(0, userString.length-1);
+      currCell.innerHTML = userString;
+      break;
+    case "+":
+      insert();
+      break;
+    default:
+      if( event.key.length == 1 && cursor != length  && userString.length < 13){
+        if(!typing){
+          oldString = currCell.innerHTML;
+          typing = true;
+        }
+        userString += event.key;
+        currCell.innerHTML = userString;
+      }
+  }
+  updateRegisters();
+  // Cancel the default action to avoid it being handled twice
+  event.preventDefault();
+}, true);
+
+function updateRegisters() {
+  var row = document.getElementById('registers').rows[1];
+  row.cells[0].innerHTML = A;
+  row.cells[1].innerHTML = B;
+  row.cells[2].innerHTML = C;
+  row.cells[3].innerHTML = D;
+}
+
+function moveCursor(x){
+  defocus();
+  cursor += x;
+  cursor = Math.min(cursor, length); 
+  cursor = Math.max(cursor, 0); 
+  focus();
+}
+
+function movePointerTo(n){
+	if(n >= 0 && n <= length){	
+    	program.rows[pointer].cells[0].innerHTML = " ";
+   		pointer = n;
+   		program.rows[pointer].cells[0].innerHTML = "*";
+	}else{
+    	throwError("jump outside of program");
+	}
+}
+
+function defocus(){
+  program.rows[cursor].cells[2].style.backgroundColor = '#444455';
+}
+
+function focus(){
+  program.rows[cursor].cells[2].style.backgroundColor = '#666677';
+}
+
+
+function remove(){
+  defocus();
+  program.rows[pointer].cells[0].innerHTML = " ";
+  if(cursor != length){
+    document.getElementById('program').deleteRow(cursor);
+    length--;
+  }
+  if(pointer > cursor){
+  	pointer--;
+  }
+  for (var i = 0; i < program.rows.length; i++) {
+ 	program.rows[i].cells[1].innerHTML = i+1;
+  }
+  program.rows[pointer].cells[0].innerHTML = "*";
+  focus();
+}
+
+function insert() {
+  defocus();
+  program.rows[pointer].cells[0].innerHTML = " ";
+  var newRow = program.insertRow(cursor);
+  length++;
+  if(pointer > cursor){
+     pointer++;
+  }
+  newRow.insertCell(0);
+  newRow.insertCell(1);
+  newRow.insertCell(2).innerHTML = "NULL";
+  program.rows[pointer].cells[0].innerHTML = "*";
+  for (var i = 0; i < program.rows.length; i++) {
+ 	program.rows[i].cells[1].innerHTML = i+1;
+  }
+  focus();
+}
+
+function parse(line){
+	var command = line.substring(0,4);
+    var arg1 = line.substring(5).split(",", 2)[0].trim();
+    var arg2 = line.substring(5).split(",", 2)[1];
+    if (typeof arg2 !== 'undefined'){  
+    	arg2 = arg2.trim();
+        arg2 = getValue(arg2);
+    }
+    switch(command){
+    	case "LOAD":
+        	setRegister(arg1,arg2);
+        	break;
+        case "COPY":
+        	setRegister(arg1,arg2);
+        	break;
+        case "ADDA":
+        	setRegister("A", A + getValue(arg1));
+        	break;  
+        case "ADDB":
+        	setRegister("B", B + getValue(arg1));
+        	break;      
+        case "NEGA":
+        	A*=-1;
+        	break;
+        case "OTPT":
+        	window.alert(getValue(arg1));
+            break;
+        case "INPT":
+        	clearInterval(timer);
+        	var number = parseInt(window.prompt());
+            if(isNaN(number)){
+            	throwError("unkown value "+number);
+            }else{
+            	setRegister(arg1,number);
+            }
+            if(running){
+              run();
+            }
+        	break;
+        case "JUMP":
+         	movePointerTo(getValue(arg1)-1);
+  		    return false;
+        case "JMPZ":
+         	if(A == 0){
+            	movePointerTo(getValue(arg1)-1);
+  		    	return false;
+            }
+            break;
+        case "JMPP":
+         	if(A > 0){
+            	movePointerTo(getValue(arg1)-1);
+  		    	return false;
+            }
+            break;
+        case "JMPN":
+			if(A < 0){
+            	movePointerTo(getValue(arg1)-1);
+  		    	return false;
+            }
+            break;
+        case "NULL":
+        	break;
+        default:
+		    throwError("unknown command "+command);
+    }
+    return true;
+}
+
+function setRegister(reg, number){
+    switch(reg){
+    	case "A":
+        	A = number;
+            break;
+        case "B":
+        	B = number;
+            break;
+        case "C":
+        	C = number;
+            break;
+        case "D":
+        	D = number;
+            break;
+    	default:
+        	throwError("unkown register "+reg);
+            return false;
+    }
+    return true;
+}
+
+function getValue(arg){
+	switch(arg){
+   		case "A":
+        	return A;
+        case "B":
+        	return B;
+        case "C":
+        	return C;
+        case "D":
+        	return D;
+    	default:
+        	arg = parseInt(arg);
+            if(isNaN(arg)){
+            	throwError("unkown value "+arg);
+            }else{
+            	return arg;
+            }
+	}
+}
+
+function throwError(text){
+    text = "ERROR: "+text+" on line "+(pointer+1); 
+    document.getElementById('debug').innerHTML = text;
+    document.getElementById('debug').style.color = "#D00000"; 
+    error = true;
+}
+
+function stepOne() {
+  if(pointer < length){
+    var line = program.rows[pointer].cells[2].innerHTML;
+	if(parse(line) && !error){
+    	movePointerTo(pointer + 1);  
+    }
+  }else{ 
+    reset();
+  }
+  updateRegisters();
+}
+
+function run(){
+  	running = true;
+    timer = setInterval(stepOne, 500);
+}
+
+function pause(){
+	running = false;
+	clearInterval(timer);
+}
+
+function reset() {
+  pause();
+  movePointerTo(0);
+  A = B = C = D = 0;
+  updateRegisters();
+  error = false;
+  document.getElementById('debug').innerHTML = "";
+}
+
+</script>
+
+</html>
